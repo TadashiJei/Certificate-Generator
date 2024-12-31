@@ -1,12 +1,10 @@
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
-import dynamic from 'next/dynamic';
 
-const MonacoEditor = dynamic(
-  () => import('@monaco-editor/react').then(mod => mod.Editor),
-  { ssr: false }
-);
+const MonacoEditor = lazy(() => import('@monaco-editor/react').then(mod => ({
+  default: mod.Editor
+})));
 
 interface EmailTemplate {
   id: string;

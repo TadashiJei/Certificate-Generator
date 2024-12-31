@@ -87,14 +87,16 @@ function App() {
                 <Route path=":id" element={<CertificateView />} />
                 <Route path="list" element={<CertificateList />} />
               </Route>
-              <Route path="admin" element={
-                <AdminRoute>
-                  <AdminLayout>
-                    <AdminDashboard />
-                  </AdminLayout>
-                </AdminRoute>
-              } />
             </Route>
+
+            {/* Admin routes */}
+            <Route path="/admin" element={
+              <AdminRoute>
+                <AdminLayout>
+                  <AdminDashboard />
+                </AdminLayout>
+              </AdminRoute>
+            } />
 
             {/* Redirect root to dashboard */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />

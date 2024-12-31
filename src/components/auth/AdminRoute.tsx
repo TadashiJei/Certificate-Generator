@@ -15,41 +15,54 @@ export function AdminRoute({ children }: AdminRouteProps) {
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!session?.user) {
+        console.log('No user session found');
         setIsAdmin(false);
         setLoading(false);
         return;
       }
 
       try {
+        // Log session data
+        console.log('Current Session:', {
+          user: session.user,
+          metadata: session.user.user_metadata,
+          appMetadata: session.user.app_metadata,
+        });
+
         // Check user metadata
         const metadataRole = session.user.user_metadata?.role;
+        const appMetadataRole = session.user.app_metadata?.role;
         
-        // Check database role
-        const { data, error } = await supabase
-          .from('auth.users')
-          .select('role')
+        // Check database role using profiles table
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('user_role')
           .eq('id', session.user.id)
           .single();
 
-        if (error) {
-          console.error('Error checking admin status:', error);
-          setIsAdmin(false);
-          return;
+        if (profileError) {
+          console.error('Error checking profile role:', profileError);
         }
 
-        console.log('Admin Check:', {
+        // Log all role data
+        console.log('Role Check:', {
           userId: session.user.id,
           metadataRole,
-          databaseRole: data?.role,
+          appMetadataRole,
+          profileRole: profileData?.user_role,
         });
 
-        // User is admin if either metadata or database indicates admin role
+        // User is admin if any role source indicates admin
         const isAdminUser = 
           metadataRole === 'admin' || 
-          data?.role === 'admin' ||
+          appMetadataRole === 'admin' ||
+          profileData?.user_role === 'admin' ||
           metadataRole === 'super_admin' ||
-          data?.role === 'super_admin';
+          appMetadataRole === 'super_admin' ||
+          profileData?.user_role === 'super_admin';
 
+        console.log('Admin Status:', isAdminUser);
+        
         setIsAdmin(isAdminUser);
       } catch (err) {
         console.error('Error in admin check:', err);
@@ -63,10 +76,13 @@ export function AdminRoute({ children }: AdminRouteProps) {
   }, [session]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500" />
+    </div>;
   }
 
   if (!session) {
+    console.log('Redirecting to login - No session');
     return <Navigate to="/login" />;
   }
 
