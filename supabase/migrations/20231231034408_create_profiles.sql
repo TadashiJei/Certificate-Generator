@@ -2,6 +2,7 @@
 create table if not exists profiles (
   id uuid references auth.users on delete cascade primary key,
   full_name text,
+  user_role text not null default 'user' check (user_role in ('user', 'admin', 'super_admin')),
   updated_at timestamp with time zone,
   
   constraint proper_updated_at check(updated_at <= now())
@@ -54,14 +55,30 @@ begin
       to authenticated
       with check ( auth.uid() = id );
   end if;
+
+  if not exists (
+    select from pg_policies 
+    where schemaname = 'public' 
+    and tablename = 'profiles' 
+    and policyname = 'Enable admin access for all profiles'
+  ) then
+    create policy "Enable admin access for all profiles"
+      on profiles for all
+      to authenticated
+      using (EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND user_role = 'admin'
+      ));
+  end if;
 end $$;
 
 -- Create a function to handle new user profiles
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles (id, full_name, updated_at)
-  values (new.id, new.raw_user_meta_data->>'full_name', now())
+  insert into public.profiles (id, full_name, user_role, updated_at)
+  values (new.id, new.raw_user_meta_data->>'full_name', 'user', now())
   on conflict (id) do nothing;
   return new;
 end;

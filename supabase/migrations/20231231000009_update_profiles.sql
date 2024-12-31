@@ -1,10 +1,5 @@
--- Create user_role type if it doesn't exist
-DO $$ 
-BEGIN 
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-        CREATE TYPE user_role AS ENUM ('user', 'admin', 'super_admin');
-    END IF;
-END $$;
+-- Drop user_role type if it exists
+DROP TYPE IF EXISTS user_role;
 
 -- Create profiles table if it doesn't exist
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -14,16 +9,16 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     full_name TEXT,
     avatar_url TEXT,
     website TEXT,
-    user_role user_role DEFAULT 'user'
+    user_role TEXT NOT NULL DEFAULT 'user' CHECK (user_role IN ('user', 'admin', 'super_admin'))
 );
 
 -- Update existing admin profile
 INSERT INTO public.profiles (id, user_role)
-SELECT id, 'admin'::user_role
+SELECT id, 'admin'
 FROM auth.users
 WHERE email = 'admin@certificategenerator.com'
 ON CONFLICT (id) 
-DO UPDATE SET user_role = 'admin'::user_role;
+DO UPDATE SET user_role = 'admin';
 
 -- Enable RLS on profiles
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -48,9 +43,17 @@ CREATE POLICY "Users can update own profile"
 CREATE POLICY "Admins can view all profiles"
     ON public.profiles
     FOR SELECT
-    USING (auth.jwt() ->> 'role' IN ('admin', 'super_admin'));
+    USING (EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND user_role = 'admin'
+    ));
 
 CREATE POLICY "Admins can update all profiles"
     ON public.profiles
     FOR UPDATE
-    USING (auth.jwt() ->> 'role' IN ('admin', 'super_admin'));
+    USING (EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND user_role = 'admin'
+    ));

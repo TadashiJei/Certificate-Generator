@@ -21,13 +21,14 @@ drop table if exists profiles;
 create table public.profiles (
     id uuid references auth.users on delete cascade primary key,
     full_name text,
+    user_role text not null default 'user' check (user_role in ('user', 'admin', 'super_admin')),
     updated_at timestamptz default now(),
     constraint proper_updated_at check(updated_at <= now())
 );
 
 -- Restore data from backup
-insert into profiles (id, full_name, updated_at)
-select id, full_name, updated_at 
+insert into profiles (id, full_name, updated_at, user_role)
+select id, full_name, updated_at, 'user'
 from profiles_backup
 on conflict (id) do nothing;
 
@@ -63,6 +64,14 @@ create policy "Users can update own profile."
     on profiles for update
     using ( auth.uid() = id );
 
+create policy "Admins can update any profile"
+    on profiles for update
+    using (EXISTS (
+        SELECT 1 FROM profiles
+        WHERE id = auth.uid()
+        AND user_role = 'admin'
+    ));
+
 -- Function to handle new user profiles
 create function public.handle_new_user()
 returns trigger
@@ -70,8 +79,8 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
-    insert into public.profiles (id, full_name)
-    values (new.id, new.raw_user_meta_data->>'full_name');
+    insert into public.profiles (id, full_name, user_role)
+    values (new.id, new.raw_user_meta_data->>'full_name', 'user');
     return new;
 end;
 $$;
@@ -82,7 +91,7 @@ create trigger on_auth_user_created
     for each row execute procedure public.handle_new_user();
 
 -- Insert initial data for existing users
-insert into public.profiles (id, full_name)
-select id, raw_user_meta_data->>'full_name'
+insert into public.profiles (id, full_name, user_role)
+select id, raw_user_meta_data->>'full_name', 'user'
 from auth.users
 on conflict (id) do nothing;
