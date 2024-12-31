@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './components/auth/AuthProvider';
+import { AdminRoute } from './components/auth/AdminRoute';
 import { LoginPage } from './components/auth/LoginPage';
 import { RegisterPage } from './components/auth/RegisterPage';
 import { ResetPassword } from './components/auth/ResetPassword';
@@ -18,6 +19,11 @@ import { CertificateList } from './components/certificates/CertificateList';
 import { NewCertificatePage } from './components/certificates/NewCertificatePage';
 import { CertificateView } from './components/certificates/CertificateView';
 import { CertificatesPage } from './components/certificates/CertificatesPage';
+import { AdminLayout } from './components/admin/AdminLayout';
+import { UserManagement } from './components/admin/UserManagement';
+import { SystemSettings } from './components/admin/SystemSettings';
+import { UsageStatistics } from './components/admin/UsageStatistics';
+import { AdminDashboard } from './components/admin/AdminDashboard';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -81,6 +87,13 @@ function App() {
                 <Route path=":id" element={<CertificateView />} />
                 <Route path="list" element={<CertificateList />} />
               </Route>
+              <Route path="admin" element={
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminDashboard />
+                  </AdminLayout>
+                </AdminRoute>
+              } />
             </Route>
 
             {/* Redirect root to dashboard */}
