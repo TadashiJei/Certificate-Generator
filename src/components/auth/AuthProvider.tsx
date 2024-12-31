@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useSupabase } from '@/lib/supabase/supabase-provider';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '../../lib/supabase';
 
 interface AuthContextType {
   session: Session | null;
@@ -12,11 +12,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { supabase } = useSupabase();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,12 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      console.log('Initial Auth Session:', {
-        user: session?.user,
-        metadata: session?.user?.user_metadata,
-        appMetadata: session?.user?.app_metadata,
-        role: session?.user?.role,
-      });
       setLoading(false);
     });
 
@@ -38,27 +29,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      console.log('Auth State Change:', {
-        event: _event,
-        user: session?.user,
-        metadata: session?.user?.user_metadata,
-        appMetadata: session?.user?.app_metadata,
-        role: session?.user?.role,
-      });
-      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const value = {
-    session,
-    loading,
-  };
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
 
   return (
-    <AuthContext.Provider value={value}>
-      {!loading && children}
+    <AuthContext.Provider value={{ session, loading }}>
+      {children}
     </AuthContext.Provider>
   );
+}
+
+export function useAuth() {
+  return useContext(AuthContext);
 }

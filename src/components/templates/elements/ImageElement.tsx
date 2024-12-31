@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from '../../ui/Button';
 import { useSupabase } from '@/lib/supabase/supabase-provider';
-import { validateAndOptimizeImage } from '@/lib/fileUpload';
+import { validateAndOptimizeImage, uploadFile } from '@/lib/fileUpload';
 import { useToast } from '@/components/ui/Toast';
+import { cn } from '@/lib/utils';
 
 interface ImageElementProps {
   id: string;
@@ -16,22 +16,25 @@ interface ImageElementProps {
 export function ImageElement({ id, content, position, style = {}, onUpdate, onDelete }: ImageElementProps) {
   const { supabase } = useSupabase();
   const { toast } = useToast();
-  const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [elementPosition, setElementPosition] = useState(position);
-  const elementRef = useRef<HTMLDivElement>(null);
   const [elementSize, setElementSize] = useState({
     width: parseInt(style.width as string) || 200,
     height: parseInt(style.height as string) || 200
   });
+  const elementRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     setElementPosition(position);
   }, [position]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isResizing) return;
+    
     if (e.target === elementRef.current || (e.target as HTMLElement).tagName === 'IMG') {
       setIsDragging(true);
       setDragStart({
@@ -39,7 +42,7 @@ export function ImageElement({ id, content, position, style = {}, onUpdate, onDe
         y: e.clientY - elementPosition.y
       });
     }
-  }, [elementPosition.x, elementPosition.y]);
+  }, [elementPosition.x, elementPosition.y, isResizing]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (isDragging) {
@@ -53,13 +56,14 @@ export function ImageElement({ id, content, position, style = {}, onUpdate, onDe
       const rect = elementRef.current.getBoundingClientRect();
       const newWidth = Math.max(50, e.clientX - rect.left);
       const newHeight = Math.max(50, e.clientY - rect.top);
+      
       setElementSize({ width: newWidth, height: newHeight });
-      onUpdate(id, { 
-        style: { 
+      onUpdate(id, {
+        style: {
           ...style,
           width: `${newWidth}px`,
           height: `${newHeight}px`
-        } 
+        }
       });
     }
   }, [isDragging, isResizing, dragStart, id, onUpdate, style]);
@@ -80,6 +84,12 @@ export function ImageElement({ id, content, position, style = {}, onUpdate, onDe
     }
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isUploading && !isDragging && !isResizing && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsResizing(true);
@@ -87,51 +97,48 @@ export function ImageElement({ id, content, position, style = {}, onUpdate, onDe
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || isUploading) return;
 
     try {
-      // Validate and optimize the image
-      const { valid, error, optimizedFile } = await validateAndOptimizeImage(file, {
-        maxSizeBytes: 5 * 1024 * 1024, // 5MB
-        allowedTypes: ['image/jpeg', 'image/png', 'image/gif'],
-        maxWidth: 2000,
-        maxHeight: 2000,
-        compressionQuality: 0.8
-      });
-
-      if (!valid || !optimizedFile) {
-        toast({
-          title: 'Error',
-          description: error || 'Invalid image file',
-          variant: 'destructive'
-        });
-        return;
+      setIsUploading(true);
+      
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to upload images');
       }
 
-      // Create a placeholder immediately for better UX
-      const tempUrl = URL.createObjectURL(optimizedFile);
-      onUpdate(id, { content: tempUrl });
+      // Validate and optimize the image
+      const { valid, error: validationError, optimizedFile } = await validateAndOptimizeImage(file);
+      if (!valid || !optimizedFile) {
+        throw new Error(validationError || 'Invalid image file');
+      }
 
       // Upload to Supabase Storage
       const fileExt = optimizedFile.name.split('.').pop();
       const fileName = `${id}-${Date.now()}.${fileExt}`;
-      const filePath = `template-images/${fileName}`;
+      const filePath = `templates/${fileName}`;
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('certificates')
-        .upload(filePath, optimizedFile);
+      const { success, error: uploadError, url } = await uploadFile(
+        optimizedFile,
+        filePath,
+        user.id
+      );
 
-      if (uploadError) {
-        throw uploadError;
+      if (!success || !url) {
+        throw new Error(uploadError || 'Failed to upload image');
       }
 
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('certificates')
-        .getPublicUrl(filePath);
-
       // Update the element with the permanent URL
-      onUpdate(id, { content: publicUrl });
+      onUpdate(id, { 
+        content: url,
+        style: {
+          ...style,
+          width: `${elementSize.width}px`,
+          height: `${elementSize.height}px`,
+          objectFit: 'contain'
+        }
+      });
 
       toast({
         title: 'Success',
@@ -145,99 +152,71 @@ export function ImageElement({ id, content, position, style = {}, onUpdate, onDe
         description: error instanceof Error ? error.message : 'Failed to upload image',
         variant: 'destructive'
       });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   return (
     <div
       ref={elementRef}
+      className={cn(
+        'absolute cursor-move select-none',
+        isDragging && 'z-50',
+        isResizing && 'z-50',
+        !isDragging && !isResizing && 'z-10'
+      )}
       style={{
-        position: 'absolute',
-        left: `${elementPosition.x}px`,
-        top: `${elementPosition.y}px`,
+        transform: `translate(${elementPosition.x}px, ${elementPosition.y}px)`,
         width: `${elementSize.width}px`,
-        height: `${elementSize.height}px`,
-        cursor: isDragging ? 'grabbing' : 'grab',
-        padding: '4px',
-        border: '1px solid #e2e8f0',
-        borderRadius: '4px',
-        backgroundColor: 'white',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        userSelect: 'none',
-        zIndex: isDragging ? 1000 : 1,
-        ...style,
+        height: `${elementSize.height}px`
       }}
       onMouseDown={handleMouseDown}
-      className="group"
+      onClick={handleClick}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageUpload}
+        disabled={isUploading}
+      />
+      
       {content ? (
-        <img
-          src={content}
-          alt="Template element"
-          className="w-full h-full object-contain"
-          draggable={false}
-          onError={() => {
-            console.error('Image failed to load:', content);
-            onUpdate(id, { content: '' });
-          }}
-        />
+        <div className="relative w-full h-full group">
+          <img
+            src={content}
+            alt="Template element"
+            className="w-full h-full object-contain"
+            style={style}
+            draggable={false}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-white border border-gray-300 opacity-0 group-hover:opacity-100"
+            onMouseDown={handleResizeStart}
+          />
+        </div>
       ) : (
-        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-          <label className="cursor-pointer flex flex-col items-center gap-2">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-            <Button variant="secondary" type="button">
-              Upload Image
-            </Button>
-          </label>
+        <div 
+          className={cn(
+            'flex items-center justify-center w-full h-full',
+            'bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg',
+            isUploading ? 'opacity-50' : 'hover:bg-gray-200'
+          )}
+        >
+          <span className="text-gray-500">
+            {isUploading ? 'Uploading...' : 'Click to add image'}
+          </span>
+          <div
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-white border border-gray-300 opacity-0 group-hover:opacity-100"
+            onMouseDown={handleResizeStart}
+          />
         </div>
       )}
-      
-      <div className="absolute -top-8 right-0 hidden group-hover:flex gap-2 bg-white rounded-md shadow-sm p-1">
-        <label className="cursor-pointer">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-          <button
-            className="p-1 text-gray-500 hover:text-gray-700"
-            title="Replace Image"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </label>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(id);
-          }}
-          className="p-1 text-gray-500 hover:text-red-600"
-          title="Delete"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        </button>
-      </div>
-      
-      <div
-        className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize opacity-0 group-hover:opacity-100"
-        onMouseDown={handleResizeStart}
-        style={{
-          background: 'linear-gradient(135deg, transparent 50%, #718096 50%)',
-        }}
-      />
     </div>
   );
 }

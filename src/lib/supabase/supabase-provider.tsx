@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createContext, useContext, useEffect } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../../types/supabase';
+import { supabase } from './supabase-client';
 
 interface SupabaseContext {
   supabase: SupabaseClient<Database>;
@@ -9,11 +10,6 @@ interface SupabaseContext {
 const Context = createContext<SupabaseContext | undefined>(undefined);
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createClient<Database>(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_ANON_KEY
-  ));
-
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
@@ -31,7 +27,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
   return (
     <Context.Provider value={{ supabase }}>

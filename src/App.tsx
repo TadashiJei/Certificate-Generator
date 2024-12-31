@@ -43,60 +43,58 @@ const queryClient = new QueryClient({
 
 function App() {
   return (
-    <>
-      <QueryClientProvider client={queryClient}>
-        <SupabaseProvider>
-          <BrowserRouter>
-            <AuthProvider>
-              <Routes>
-                {/* Public routes */}
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-                <Route path="/update-password" element={<UpdatePassword />} />
+    <QueryClientProvider client={queryClient}>
+      <SupabaseProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/update-password" element={<UpdatePassword />} />
 
-                {/* Protected dashboard routes */}
-                <Route path="/dashboard" element={
-                  <PrivateRoute>
-                    <DashboardLayout />
-                  </PrivateRoute>
-                }>
-                  <Route index element={<Overview />} />
-                  <Route path="profile" element={<ProfilePage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="templates">
-                    <Route index element={<TemplateList />} />
-                    <Route path="new" element={<NewTemplatePage />} />
-                    <Route path=":id" element={<TemplateView />} />
-                    <Route path=":id/edit" element={<TemplateEditor />} />
-                  </Route>
-                  <Route path="certificates">
-                    <Route index element={<CertificatesPage />} />
-                    <Route path="new" element={<NewCertificatePage />} />
-                    <Route path=":id" element={<CertificateView />} />
-                    <Route path="list" element={<CertificateList />} />
-                  </Route>
+              {/* Protected dashboard routes */}
+              <Route path="/dashboard" element={
+                <PrivateRoute>
+                  <DashboardLayout />
+                </PrivateRoute>
+              }>
+                <Route index element={<Overview />} />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="templates">
+                  <Route index element={<TemplateList />} />
+                  <Route path="new" element={<NewTemplatePage />} />
+                  <Route path=":id" element={<TemplateView />} />
+                  <Route path=":id/edit" element={<TemplateEditor />} />
                 </Route>
+                <Route path="certificates">
+                  <Route index element={<CertificatesPage />} />
+                  <Route path="new" element={<NewCertificatePage />} />
+                  <Route path=":id" element={<CertificateView />} />
+                  <Route path="list" element={<CertificateList />} />
+                </Route>
+              </Route>
 
-                {/* Admin routes */}
-                <Route path="/admin" element={
-                  <AdminRoute>
-                    <AdminLayout>
-                      <AdminDashboard />
-                    </AdminLayout>
-                  </AdminRoute>
-                } />
+              {/* Admin routes */}
+              <Route path="/admin" element={
+                <AdminRoute>
+                  <AdminLayout>
+                    <AdminDashboard />
+                  </AdminLayout>
+                </AdminRoute>
+              } />
 
-                {/* Redirect root to dashboard */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </AuthProvider>
-          </BrowserRouter>
-        </SupabaseProvider>
-      </QueryClientProvider>
-      <Toaster />
-    </>
+              {/* Redirect root to dashboard */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </AuthProvider>
+          <Toaster />
+        </BrowserRouter>
+      </SupabaseProvider>
+    </QueryClientProvider>
   );
 }
 

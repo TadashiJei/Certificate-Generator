@@ -1,9 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-);
+import { supabase } from './supabase/supabase-client';
 
 export interface FileUploadConfig {
   maxSizeBytes: number;
@@ -52,58 +47,49 @@ export async function validateAndOptimizeImage(
       img.onerror = reject;
       img.src = imageUrl;
     });
+    URL.revokeObjectURL(imageUrl);
 
     // Check dimensions
-    if (img.width > finalConfig.maxWidth! || img.height > finalConfig.maxHeight!) {
-      // Create a canvas to resize the image
+    if (finalConfig.maxWidth && img.width > finalConfig.maxWidth) {
+      return {
+        valid: false,
+        error: `Image width (${img.width}px) exceeds maximum allowed width (${finalConfig.maxWidth}px)`
+      };
+    }
+
+    if (finalConfig.maxHeight && img.height > finalConfig.maxHeight) {
+      return {
+        valid: false,
+        error: `Image height (${img.height}px) exceeds maximum allowed height (${finalConfig.maxHeight}px)`
+      };
+    }
+
+    // Optimize image if needed
+    if (finalConfig.compressionQuality && finalConfig.compressionQuality < 1) {
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d')!;
-
-      // Calculate new dimensions while maintaining aspect ratio
-      let newWidth = img.width;
-      let newHeight = img.height;
-
-      if (newWidth > finalConfig.maxWidth!) {
-        newHeight = (finalConfig.maxWidth! * newHeight) / newWidth;
-        newWidth = finalConfig.maxWidth!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
       }
 
-      if (newHeight > finalConfig.maxHeight!) {
-        newWidth = (finalConfig.maxHeight! * newWidth) / newHeight;
-        newHeight = finalConfig.maxHeight!;
-      }
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
 
-      // Set canvas dimensions and draw resized image
-      canvas.width = newWidth;
-      canvas.height = newHeight;
-      ctx.drawImage(img, 0, 0, newWidth, newHeight);
-
-      // Convert canvas to blob
-      const blob = await new Promise<Blob>((resolve) =>
+      const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob(
-          (b) => resolve(b!),
+          (blob) => resolve(blob!),
           file.type,
           finalConfig.compressionQuality
-        )
-      );
-
-      // Clean up
-      URL.revokeObjectURL(imageUrl);
-
-      // Create new file from blob
-      const optimizedFile = new File([blob], file.name, {
-        type: file.type,
-        lastModified: file.lastModified,
+        );
       });
 
       return {
         valid: true,
-        optimizedFile
+        optimizedFile: new File([blob], file.name, { type: file.type })
       };
     }
 
-    // If image is within size limits, return original file
-    URL.revokeObjectURL(imageUrl);
     return {
       valid: true,
       optimizedFile: file
@@ -111,7 +97,7 @@ export async function validateAndOptimizeImage(
   } catch (error) {
     return {
       valid: false,
-      error: error instanceof Error ? error.message : 'Failed to process image'
+      error: 'Failed to process image'
     };
   }
 }
@@ -124,7 +110,10 @@ export async function uploadFile(
   try {
     const { data, error } = await supabase.storage
       .from('certificates')
-      .upload(`${userId}/${path}`, file);
+      .upload(`${userId}/${path}`, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
 
     if (error) {
       throw error;
@@ -139,6 +128,7 @@ export async function uploadFile(
       url: publicUrl
     };
   } catch (error) {
+    console.error('Error uploading file:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to upload file'

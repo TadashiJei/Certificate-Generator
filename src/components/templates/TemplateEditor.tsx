@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
@@ -172,29 +172,55 @@ export function TemplateEditor() {
     () =>
       debounce((template: Template) => {
         if (!template?.id) return;
+        
+        // Only update if there are actual changes
+        const currentTemplate = queryClient.getQueryData<Template>(['template', template.id]);
+        if (JSON.stringify(currentTemplate) === JSON.stringify(template)) {
+          return;
+        }
+
         console.log('Debounced update triggered for template:', template.id);
         updateMutation.mutate(template);
-      }, 500),
-    [updateMutation]
+      }, 2000), // Increased debounce time to 2 seconds
+    [queryClient, updateMutation]
   );
 
-  useEffect(() => {
-    return () => {
-      debouncedUpdate.flush();
-    };
-  }, [debouncedUpdate]);
-
-  const handleSave = async () => {
+  // Handle template updates
+  const handleTemplateUpdate = useCallback((updates: Partial<Template>) => {
     if (!template) return;
-    
-    try {
-      await updateMutation.mutateAsync(template);
-      // toast.success('Template saved successfully!');
-    } catch (error) {
-      console.error('Save error:', error);
-      // toast.error('Failed to save template. Please try again.');
-    }
-  };
+
+    const updatedTemplate = {
+      ...template,
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+
+    setTemplate(updatedTemplate);
+    debouncedUpdate(updatedTemplate);
+  }, [template, debouncedUpdate]);
+
+  // Handle element updates
+  const handleElementUpdate = useCallback((elementId: string, updates: Partial<Element>) => {
+    if (!template) return;
+
+    const updatedElements = template.design_data.elements.map(element =>
+      element.id === elementId
+        ? { ...element, ...updates }
+        : element
+    );
+
+    const updatedTemplate = {
+      ...template,
+      design_data: {
+        ...template.design_data,
+        elements: updatedElements,
+      },
+      updated_at: new Date().toISOString(),
+    };
+
+    setTemplate(updatedTemplate);
+    debouncedUpdate(updatedTemplate);
+  }, [template, debouncedUpdate]);
 
   const handleAddElement = (type: 'text' | 'image' | 'shape' | 'placeholder') => {
     if (!template) return;
@@ -219,42 +245,12 @@ export function TemplateEditor() {
         ...template.design_data,
         elements: [...template.design_data.elements, newElement],
       },
+      updated_at: new Date().toISOString(),
     };
 
     setTemplate(updatedTemplate);
     queryClient.setQueryData(['template', id], updatedTemplate);
-    try {
-      debouncedUpdate(updatedTemplate);
-    } catch (error) {
-      console.error('Error in debounced update:', error);
-      // toast.error('Failed to save changes. Please try again.');
-    }
-  };
-
-  const handleUpdateElement = (elementId: string, updates: Partial<Element>) => {
-    if (!template) return;
-
-    const updatedElements = template.design_data.elements.map((element) =>
-      element.id === elementId ? { ...element, ...updates } : element
-    );
-
-    const updatedTemplate = {
-      ...template,
-      design_data: {
-        ...template.design_data,
-        elements: updatedElements,
-      },
-    };
-
-    setTemplate(updatedTemplate);
-    queryClient.setQueryData(['template', id], updatedTemplate);
-    
-    try {
-      debouncedUpdate(updatedTemplate);
-    } catch (error) {
-      console.error('Error in debounced update:', error);
-      // toast.error('Failed to save changes. Please try again.');
-    }
+    debouncedUpdate(updatedTemplate);
   };
 
   const handleDeleteElement = (elementId: string) => {
@@ -271,16 +267,12 @@ export function TemplateEditor() {
         ...template.design_data,
         elements: updatedElements,
       },
+      updated_at: new Date().toISOString(),
     };
 
     setTemplate(updatedTemplate);
     queryClient.setQueryData(['template', id], updatedTemplate);
-    try {
-      debouncedUpdate(updatedTemplate);
-    } catch (error) {
-      console.error('Error in debounced update:', error);
-      // toast.error('Failed to save changes. Please try again.');
-    }
+    debouncedUpdate(updatedTemplate);
   };
 
   const handleUpdateProperties = (properties: Template['design_data']['properties']) => {
@@ -292,15 +284,29 @@ export function TemplateEditor() {
         ...template.design_data,
         properties,
       },
+      updated_at: new Date().toISOString(),
     };
 
     setTemplate(updatedTemplate);
     queryClient.setQueryData(['template', id], updatedTemplate);
+    debouncedUpdate(updatedTemplate);
+  };
+
+  useEffect(() => {
+    return () => {
+      debouncedUpdate.flush();
+    };
+  }, [debouncedUpdate]);
+
+  const handleSave = async () => {
+    if (!template) return;
+    
     try {
-      debouncedUpdate(updatedTemplate);
+      await updateMutation.mutateAsync(template);
+      // toast.success('Template saved successfully!');
     } catch (error) {
-      console.error('Error in debounced update:', error);
-      // toast.error('Failed to save changes. Please try again.');
+      console.error('Save error:', error);
+      // toast.error('Failed to save template. Please try again.');
     }
   };
 
@@ -423,7 +429,7 @@ export function TemplateEditor() {
                             <TextElement
                               key={element.id}
                               {...element}
-                              onUpdate={handleUpdateElement}
+                              onUpdate={handleElementUpdate}
                               onDelete={handleDeleteElement}
                             />
                           );
@@ -432,7 +438,7 @@ export function TemplateEditor() {
                             <ImageElement
                               key={element.id}
                               {...element}
-                              onUpdate={handleUpdateElement}
+                              onUpdate={handleElementUpdate}
                               onDelete={handleDeleteElement}
                             />
                           );
@@ -441,7 +447,7 @@ export function TemplateEditor() {
                             <ShapeElement
                               key={element.id}
                               {...element}
-                              onUpdate={handleUpdateElement}
+                              onUpdate={handleElementUpdate}
                               onDelete={handleDeleteElement}
                             />
                           );
@@ -450,7 +456,7 @@ export function TemplateEditor() {
                             <PlaceholderElement
                               key={element.id}
                               {...element}
-                              onUpdate={handleUpdateElement}
+                              onUpdate={handleElementUpdate}
                               onDelete={handleDeleteElement}
                             />
                           );
