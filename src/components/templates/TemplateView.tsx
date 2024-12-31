@@ -166,44 +166,46 @@ export function TemplateView() {
         </div>
 
         {/* Template Preview */}
-        <div
-          className="bg-white rounded-lg shadow-sm relative mx-auto overflow-hidden"
-          style={{
-            width: `${template.design_data.properties.size.width * 96}px`,
-            height: `${template.design_data.properties.size.height * 96}px`,
-            margin: '0 auto',
-            background: template.design_data.properties.background.type === 'color'
-              ? template.design_data.properties.background.value
-              : `url(${template.design_data.properties.background.value}) center/cover no-repeat`,
-            transform: template.design_data.properties.orientation === 'landscape' ? 'rotate(90deg)' : 'none',
-          }}
-        >
+        <div className="bg-white rounded-lg shadow-sm relative mx-auto overflow-hidden">
           <div
-            className="absolute inset-0"
+            className="relative"
             style={{
-              margin: `${template.design_data.properties.margins.top * 96}px ${template.design_data.properties.margins.right * 96}px ${template.design_data.properties.margins.bottom * 96}px ${template.design_data.properties.margins.left * 96}px`,
-              padding: `${template.design_data.properties.padding.top * 96}px ${template.design_data.properties.padding.right * 96}px ${template.design_data.properties.padding.bottom * 96}px ${template.design_data.properties.padding.left * 96}px`,
+              width: `${template.design_data.properties.size.width}${template.design_data.properties.size.unit}`,
+              height: `${template.design_data.properties.size.height}${template.design_data.properties.size.unit}`,
+              margin: '0 auto',
+              background: template.design_data.properties.background.type === 'color'
+                ? template.design_data.properties.background.value
+                : `url(${template.design_data.properties.background.value}) center/cover no-repeat`,
+              transform: template.design_data.properties.orientation === 'landscape' ? 'rotate(90deg)' : 'none',
             }}
           >
-            {template.design_data.elements.map((element) => (
-              <div
-                key={element.id}
-                style={{
-                  position: 'absolute',
-                  left: `${element.position.x * 100}%`,
-                  top: `${element.position.y * 100}%`,
-                  transform: 'translate(-50%, -50%)',
-                  ...element.style,
-                }}
-              >
-                {element.content}
-              </div>
-            ))}
+            <div
+              className="absolute inset-0"
+              style={{
+                margin: `${template.design_data.properties.margins.top}${template.design_data.properties.margins.unit} ${template.design_data.properties.margins.right}${template.design_data.properties.margins.unit} ${template.design_data.properties.margins.bottom}${template.design_data.properties.margins.unit} ${template.design_data.properties.margins.left}${template.design_data.properties.margins.unit}`,
+                padding: `${template.design_data.properties.padding.top}${template.design_data.properties.padding.unit} ${template.design_data.properties.padding.right}${template.design_data.properties.padding.unit} ${template.design_data.properties.padding.bottom}${template.design_data.properties.padding.unit} ${template.design_data.properties.padding.left}${template.design_data.properties.padding.unit}`,
+              }}
+            >
+              {template.design_data.elements.map((element) => (
+                <div
+                  key={element.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${element.position.x}%`,
+                    top: `${element.position.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    ...element.style,
+                  }}
+                >
+                  {element.content}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Preview Mode */}
+      {/* Preview Modal */}
       {showPreview && (
         <PreviewMode
           elements={template.design_data.elements}

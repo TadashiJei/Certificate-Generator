@@ -5,6 +5,7 @@ import { Database } from '../../types/supabase';
 import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useDeleteTemplate } from './hooks/useDeleteTemplate';
+import { DuplicateTemplateButton } from './DuplicateTemplateButton';
 
 type Template = Database['public']['Tables']['templates']['Row'];
 
@@ -23,18 +24,30 @@ export function TemplateCard({ template, onDelete }: TemplateCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { mutate: deleteTemplate, isLoading: isDeleting } = useDeleteTemplate();
 
-  const handleEdit = () => {
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
     navigate(`/dashboard/templates/${template.id}/edit`);
+  };
+
+  const handleView = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/dashboard/templates/${template.id}`);
   };
 
   const handleDelete = () => {
     deleteTemplate(template.id, {
-      onSuccess: () => setShowDeleteConfirm(false),
+      onSuccess: () => {
+        setShowDeleteConfirm(false);
+        onDelete();
+      },
     });
   };
 
   return (
-    <div className="bg-white overflow-hidden shadow rounded-lg">
+    <div 
+      className="bg-white overflow-hidden shadow rounded-lg cursor-pointer" 
+      onClick={handleView}
+    >
       <div className="p-6">
         <div className="flex justify-between items-start">
           <div>
@@ -42,17 +55,24 @@ export function TemplateCard({ template, onDelete }: TemplateCardProps) {
             <p className="mt-1 text-sm text-gray-500">{template.description}</p>
           </div>
           <div className="flex gap-2">
+            <DuplicateTemplateButton 
+              templateId={template.id} 
+              className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
+            />
+            <button
+              onClick={handleEdit}
+              className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-gray-100"
+            >
+              <PencilIcon className="h-5 w-5" />
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onDelete();
+                setShowDeleteConfirm(true);
               }}
               className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-gray-100"
-              title="Delete template"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+              <TrashIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -60,27 +80,6 @@ export function TemplateCard({ template, onDelete }: TemplateCardProps) {
           <p className="text-sm text-gray-500">
             Created {new Date(template.created_at).toLocaleDateString()}
           </p>
-        </div>
-      </div>
-      <div className="bg-gray-50 px-6 py-4">
-        <div className="flex justify-end space-x-3">
-          <Button
-            variant="secondary"
-            onClick={() => navigate(`/dashboard/templates/${template.id}`)}
-          >
-            View
-          </Button>
-          <Button
-            onClick={() => navigate(`/dashboard/templates/${template.id}/edit`)}
-          >
-            Edit
-          </Button>
-          <Button 
-            variant="danger" 
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            Delete
-          </Button>
         </div>
       </div>
       <ConfirmDialog

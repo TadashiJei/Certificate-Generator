@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '../../ui/Button';
+import { useSupabase } from '@/lib/supabase/supabase-provider';
+import { validateAndOptimizeImage } from '@/lib/fileUpload';
+import { useToast } from '@/components/ui/Toast';
 
 interface ImageElementProps {
   id: string;
@@ -11,6 +14,8 @@ interface ImageElementProps {
 }
 
 export function ImageElement({ id, content, position, style = {}, onUpdate, onDelete }: ImageElementProps) {
+  const { supabase } = useSupabase();
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -85,18 +90,61 @@ export function ImageElement({ id, content, position, style = {}, onUpdate, onDe
     if (!file) return;
 
     try {
-      // Create a placeholder immediately for better UX
-      const imageUrl = URL.createObjectURL(file);
-      onUpdate(id, { content: imageUrl });
+      // Validate and optimize the image
+      const { valid, error, optimizedFile } = await validateAndOptimizeImage(file, {
+        maxSizeBytes: 5 * 1024 * 1024, // 5MB
+        allowedTypes: ['image/jpeg', 'image/png', 'image/gif'],
+        maxWidth: 2000,
+        maxHeight: 2000,
+        compressionQuality: 0.8
+      });
 
-      // TODO: Implement actual image upload to storage
-      // For now, we'll keep using the blob URL
-      // const formData = new FormData();
-      // formData.append('image', file);
-      // const response = await uploadToStorage(formData);
-      // onUpdate(id, { content: response.url });
+      if (!valid || !optimizedFile) {
+        toast({
+          title: 'Error',
+          description: error || 'Invalid image file',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Create a placeholder immediately for better UX
+      const tempUrl = URL.createObjectURL(optimizedFile);
+      onUpdate(id, { content: tempUrl });
+
+      // Upload to Supabase Storage
+      const fileExt = optimizedFile.name.split('.').pop();
+      const fileName = `${id}-${Date.now()}.${fileExt}`;
+      const filePath = `template-images/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('certificates')
+        .upload(filePath, optimizedFile);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('certificates')
+        .getPublicUrl(filePath);
+
+      // Update the element with the permanent URL
+      onUpdate(id, { content: publicUrl });
+
+      toast({
+        title: 'Success',
+        description: 'Image uploaded successfully'
+      });
+
     } catch (error) {
       console.error('Error uploading image:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to upload image',
+        variant: 'destructive'
+      });
     }
   };
 
