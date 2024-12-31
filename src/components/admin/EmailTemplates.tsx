@@ -1,7 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
-import { Editor } from '@monaco-editor/react';
+import dynamic from 'next/dynamic';
+
+const MonacoEditor = dynamic(
+  () => import('@monaco-editor/react').then(mod => mod.Editor),
+  { ssr: false }
+);
 
 interface EmailTemplate {
   id: string;
@@ -248,22 +253,35 @@ export function EmailTemplates() {
                   Content
                 </label>
                 {isEditing ? (
-                  <Editor
-                    height="300px"
-                    defaultLanguage="html"
-                    value={selectedTemplate.content}
-                    onChange={(value) =>
-                      setSelectedTemplate({
-                        ...selectedTemplate,
-                        content: value || '',
-                      })
-                    }
-                    options={{
-                      minimap: { enabled: false },
-                      lineNumbers: 'on',
-                      wordWrap: 'on',
-                    }}
-                  />
+                  <Suspense fallback={
+                    <textarea
+                      value={selectedTemplate.content}
+                      onChange={(e) =>
+                        setSelectedTemplate({
+                          ...selectedTemplate,
+                          content: e.target.value,
+                        })
+                      }
+                      className="mt-1 block w-full h-64 rounded-md border-gray-300 shadow-sm font-mono"
+                    />
+                  }>
+                    <MonacoEditor
+                      height="300px"
+                      defaultLanguage="html"
+                      value={selectedTemplate.content}
+                      onChange={(value) =>
+                        setSelectedTemplate({
+                          ...selectedTemplate,
+                          content: value || '',
+                        })
+                      }
+                      options={{
+                        minimap: { enabled: false },
+                        lineNumbers: 'on',
+                        wordWrap: 'on',
+                      }}
+                    />
+                  </Suspense>
                 ) : (
                   <pre className="mt-1 p-4 bg-gray-50 rounded-md overflow-auto">
                     {selectedTemplate.content}
