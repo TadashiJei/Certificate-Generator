@@ -11,6 +11,7 @@ import {
   UserIcon,
   Bars3Icon,
   XMarkIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 
@@ -18,6 +19,7 @@ const navigation = [
   { name: 'Overview', href: '/dashboard', icon: HomeIcon },
   { name: 'Templates', href: '/dashboard/templates', icon: DocumentDuplicateIcon },
   { name: 'Certificates', href: '/dashboard/certificates', icon: DocumentPlusIcon },
+  { name: 'Data', href: '/dashboard/data', icon: TableCellsIcon },
 ];
 
 const userNavigation = [

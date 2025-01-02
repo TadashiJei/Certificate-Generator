@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider';
 import {
   TableCellsIcon,
   ClipboardDocumentListIcon,
@@ -29,7 +30,22 @@ const features = [
 
 export function DataManagement() {
   const location = useLocation();
+  const { session, loading } = useAuth();
   const isRoot = location.pathname === '/dashboard/data';
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500" />
+      </div>
+    );
+  }
+
+  // Check authentication
+  if (!session) {
+    return <Navigate to="/login" />;
+  }
 
   if (!isRoot) {
     return <Outlet />;

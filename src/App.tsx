@@ -28,6 +28,10 @@ import { AdminLayout } from './components/admin/AdminLayout';
 import { SystemSettings } from './components/admin/SystemSettings';
 import { UsageStatistics } from './components/admin/UsageStatistics';
 import { AdminDashboard } from './components/admin/AdminDashboard';
+import { DataManagement } from './components/data/DataManagement';
+import { CSVUpload } from './components/data/CSVUpload';
+import { DataPreview } from './components/data/DataPreview';
+import { FieldMapping } from './components/data/FieldMapping';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -74,6 +78,12 @@ function App() {
                   <Route path="new" element={<NewCertificatePage />} />
                   <Route path=":id" element={<CertificateView />} />
                   <Route path="list" element={<CertificateList />} />
+                </Route>
+                <Route path="data">
+                  <Route index element={<DataManagement />} />
+                  <Route path="upload" element={<CSVUpload />} />
+                  <Route path="preview" element={<DataPreview />} />
+                  <Route path="mapping" element={<FieldMapping />} />
                 </Route>
               </Route>
 
