@@ -16,6 +16,7 @@ import { ProfilePage } from './components/profile/ProfilePage';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { TemplateList } from './components/templates/TemplateList';
 import { NewTemplatePage } from './components/templates/NewTemplatePage';
+import { UploadTemplatePage } from './components/templates/UploadTemplatePage';
 import { TemplateView } from './components/templates/TemplateView';
 import { TemplateEditor } from './components/templates/TemplateEditor';
 import { CertificatesPage } from './components/certificates/CertificatesPage';
@@ -70,6 +71,7 @@ function App() {
                 <Route path="templates">
                   <Route index element={<TemplateList />} />
                   <Route path="new" element={<NewTemplatePage />} />
+                  <Route path="upload" element={<UploadTemplatePage />} />
                   <Route path=":id" element={<TemplateView />} />
                   <Route path=":id/edit" element={<TemplateEditor />} />
                 </Route>

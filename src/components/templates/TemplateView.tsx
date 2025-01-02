@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import { useAuth } from '../auth/AuthProvider';
 import { PreviewMode } from './PreviewMode';
+import { PDFPreview } from './PDFPreview';
 
 interface Template {
   id: string;
@@ -48,6 +49,7 @@ interface Template {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+  public_url?: string;
 }
 
 export function TemplateView() {
@@ -71,9 +73,21 @@ export function TemplateView() {
       if (error) throw error;
       if (!data) throw new Error('Template not found');
 
+      // Get the public URL for the template
+      let publicUrl = data.public_url;
+      if (!publicUrl && data.storage_path) {
+        const { data: { publicUrl: url } } = await supabase
+          .storage
+          .from('templates')
+          .getPublicUrl(data.storage_path);
+        publicUrl = url;
+        console.log('Generated public URL:', publicUrl);
+      }
+
       // Ensure design_data has the correct structure
       return {
         ...data,
+        public_url: publicUrl,
         design_data: {
           elements: data.design_data?.elements || [],
           properties: data.design_data?.properties || {
@@ -167,41 +181,18 @@ export function TemplateView() {
 
         {/* Template Preview */}
         <div className="bg-white rounded-lg shadow-sm relative mx-auto overflow-hidden">
-          <div
-            className="relative"
-            style={{
-              width: `${template.design_data.properties.size.width}${template.design_data.properties.size.unit}`,
-              height: `${template.design_data.properties.size.height}${template.design_data.properties.size.unit}`,
-              margin: '0 auto',
-              background: template.design_data.properties.background.type === 'color'
-                ? template.design_data.properties.background.value
-                : `url(${template.design_data.properties.background.value}) center/cover no-repeat`,
-              transform: template.design_data.properties.orientation === 'landscape' ? 'rotate(90deg)' : 'none',
-            }}
-          >
-            <div
-              className="absolute inset-0"
-              style={{
-                margin: `${template.design_data.properties.margins.top}${template.design_data.properties.margins.unit} ${template.design_data.properties.margins.right}${template.design_data.properties.margins.unit} ${template.design_data.properties.margins.bottom}${template.design_data.properties.margins.unit} ${template.design_data.properties.margins.left}${template.design_data.properties.margins.unit}`,
-                padding: `${template.design_data.properties.padding.top}${template.design_data.properties.padding.unit} ${template.design_data.properties.padding.right}${template.design_data.properties.padding.unit} ${template.design_data.properties.padding.bottom}${template.design_data.properties.padding.unit} ${template.design_data.properties.padding.left}${template.design_data.properties.padding.unit}`,
-              }}
-            >
-              {template.design_data.elements.map((element) => (
-                <div
-                  key={element.id}
-                  style={{
-                    position: 'absolute',
-                    left: `${element.position.x}%`,
-                    top: `${element.position.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                    ...element.style,
-                  }}
-                >
-                  {element.content}
-                </div>
-              ))}
+          {template.public_url ? (
+            <>
+              <div className="text-sm text-gray-500 mb-4">
+                Loading template from: {template.public_url}
+              </div>
+              <PDFPreview url={template.public_url} className="max-w-full" />
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-gray-500">No preview available - template file not found</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

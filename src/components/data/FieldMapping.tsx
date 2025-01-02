@@ -50,20 +50,61 @@ export function FieldMapping() {
   const [error, setError] = useState<string>('');
   const { user } = useAuth();
 
-  // Fetch templates and CSV columns
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        // First get all templates
+        const { data: templateData, error: templateError } = await supabase
+          .from('templates')
+          .select('id, name');
+
+        if (templateError) {
+          setError(templateError.message);
+          return;
+        }
+
+        // Then get field templates
+        const { data: fieldData, error: fieldError } = await supabase
+          .from('field_templates')
+          .select(`
+            id,
+            name,
+            display_name,
+            field_type,
+            options,
+            validation_rules
+          `)
+          .eq('is_system', true);
+
+        if (fieldError) {
+          setError(fieldError.message);
+          return;
+        }
+
+        // Map the templates with their available fields
+        setTemplates(templateData.map(template => ({
+          id: template.id,
+          name: template.name,
+          fields: fieldData.map(field => ({
+            id: field.id,
+            name: field.display_name,
+            type: field.field_type
+          }))
+        })));
+      } catch (err) {
+        setError('Error fetching templates');
+        console.error('Error:', err);
+      }
+    };
+
+    fetchTemplates();
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
 
       try {
-        // Fetch templates
-        const { data: templatesData, error: templatesError } = await supabase
-          .from('templates')
-          .select('id, name, fields');
-
-        if (templatesError) throw templatesError;
-        setTemplates(templatesData || []);
-
         // Fetch distinct CSV columns from uploaded data
         const { data: csvData, error: csvError } = await supabase
           .from('csv_data')
@@ -84,7 +125,6 @@ export function FieldMapping() {
     fetchData();
   }, [user]);
 
-  // Fetch mappings when template is selected
   useEffect(() => {
     const fetchMappings = async () => {
       if (!user || !selectedTemplate) return;
